@@ -228,6 +228,21 @@
         gap: 6px;
       }
     }
+    /* 전체화면 전용: 흰 화면 + 기존 UI 숨기기 */
+body.fs-blank {
+  background: #ffffff;
+}
+
+/* 전체화면일 때 앱 본문은 감추기 */
+body.fs-blank .app {
+  display: none;
+}
+
+/* 전체화면 상태에서 S/M 팝업은 흰 배경 위에만 뜨도록 */
+body.fs-blank .overlay {
+  background: #ffffff;
+}
+
   </style>
 </head>
 <body>
@@ -602,13 +617,15 @@
       }
     }
 
-    document.addEventListener("fullscreenchange", () => {
-      if (document.fullscreenElement) {
-        fsBtn.textContent = "✕ 전체화면 해제";
-      } else {
-        fsBtn.textContent = "⛶ 전체화면";
-      }
-    });
+   document.addEventListener("fullscreenchange", () => {
+  const isFs = !!document.fullscreenElement;
+
+  // 전체화면이면 흰 화면 모드 켜기
+  document.body.classList.toggle("fs-blank", isFs);
+
+  fsBtn.textContent = isFs ? "✕ 전체화면 해제" : "⛶ 전체화면";
+});
+
 
     // === 녹음 기능 (발음 테스트) ===
     async function startRecording() {
@@ -860,6 +877,11 @@
         } else {
           showSentencePopup();
         }
+        else if (e.key === "f" || e.key === "F") {
+  e.preventDefault();
+  toggleFullscreen();
+}
+
       } else if (e.key === "m" || e.key === "M") {
         if (meaningOverlay.classList.contains("visible")) {
           hideMeaningPopup();
