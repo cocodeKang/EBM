@@ -33,7 +33,7 @@
       align-items: center;
       margin-bottom: 10px;
     }
-    select, input[type="text"], button {
+    select, input[type="text"], button, textarea {
       font: inherit;
       padding: 6px 10px;
       border-radius: 6px;
@@ -110,14 +110,6 @@
     tr:hover {
       background: #f7f7fc;
     }
-    .badge {
-      display: inline-block;
-      padding: 2px 6px;
-      border-radius: 999px;
-      font-size: 0.7rem;
-      background: #eee;
-      margin-left: 4px;
-    }
     .mode-label {
       font-size: 0.85rem;
     }
@@ -162,20 +154,85 @@
       text-align: right;
     }
 
+    /* 녹음 영역 */
+    .record-section {
+      margin-top: 18px;
+      padding: 12px 10px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid #ddd;
+    }
+    .record-section h2 {
+      font-size: 1rem;
+      margin: 0 0 4px;
+    }
+    .record-section p {
+      font-size: 0.85rem;
+      color: #555;
+      margin: 0 0 8px;
+    }
+    .record-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .record-status {
+      font-size: 0.85rem;
+      color: #555;
+    }
+
+    /* 음성 메모 영역 */
+    .memo-section {
+      margin-top: 12px;
+      padding: 12px 10px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid #ddd;
+    }
+    .memo-section h2 {
+      font-size: 1rem;
+      margin: 0 0 4px;
+    }
+    .memo-section p {
+      font-size: 0.85rem;
+      color: #555;
+      margin: 0 0 6px;
+    }
+    #voiceMemo {
+      width: 100%;
+      min-height: 80px;
+      resize: vertical;
+    }
+    #memoStatus {
+      font-size: 0.8rem;
+      color: #666;
+      margin-top: 4px;
+    }
+    .listening {
+      border-color: #2f7cf6 !important;
+      box-shadow: 0 0 0 1px rgba(47, 124, 246, 0.4);
+    }
+
     @media (max-width: 600px) {
       th:nth-child(3), td:nth-child(3) {
         display: none; /* 모바일에서 한국어 의미 컬럼 숨기기 (팝업으로 보기) */
+      }
+      .controls {
+        gap: 6px;
       }
     }
   </style>
 </head>
 <body>
-  <div class="app" id="app">
+  <div class="app" id="appRoot">
     <h1>영어 말씀 묵상 플레이어</h1>
     <div class="hint">
-      🎧 재생모드: 1=일반 / 2=한 곡 반복 / 3=재생 후 다음 곡(수동 재생) / 4=연속 자동재생<br>
-      ⌨ 키보드: <b>S</b> = 문장 팝업, <b>M</b> = 의미 팝업<br>
-      📱 모바일: <b>위로 스와이프</b> = 문장 / <b>아래로 스와이프</b> = 의미 (팝업 터치 시 닫힘)
+      🎧 재생모드: 1=일반 / 2=한 곡 반복 / 3=재생 후 다음 곡(자동이동만) / 4=연속 자동재생<br>
+      ⌨ 키보드: <b>S</b>=문장 팝업, <b>M</b>=의미 팝업, <b>←/→</b>=이전/다음, <b>Enter</b>=재생/일시정지, <b>F</b>=전체화면 토글,<br>
+      ⌨ <b>Space</b> = 누르고 있는 동안 음성 메모 입력(음성 인식)<br>
+      📱 모바일: <b>위로 스와이프</b>=문장 / <b>아래로 스와이프</b>=의미 (팝업 터치 시 닫힘)
     </div>
 
     <div class="controls">
@@ -195,6 +252,7 @@
 
       <button id="shuffleBtn">🔀 전체 랜덤</button>
       <button id="resetOrderBtn">↺ 순차 재생(초기화)</button>
+      <button id="fsBtn">⛶ 전체화면</button>
     </div>
 
     <div class="search-box">
@@ -222,6 +280,26 @@
           <!-- JS에서 채움 -->
         </tbody>
       </table>
+    </div>
+
+    <!-- 발음 테스트용 녹음 영역 -->
+    <div class="record-section">
+      <h2>발음 연습 (음성 녹음)</h2>
+      <p>마이크로 자신의 발음을 녹음해 보고 다시 들어보면서 연습해 보세요.</p>
+      <div class="record-controls">
+        <button id="recordBtn">🎙 녹음 시작</button>
+        <button id="playRecordBtn" disabled>▶ 녹음 듣기</button>
+        <span id="recordStatus" class="record-status">대기 중</span>
+      </div>
+      <audio id="recordedAudio" controls style="width:100%;margin-top:8px;display:none;"></audio>
+    </div>
+
+    <!-- 음성 메모 영역 (Speech-to-Text) -->
+    <div class="memo-section">
+      <h2>메모 (음성 입력)</h2>
+      <p>스페이스바를 누르고 있는 동안 말하면, 아래 메모 칸에 자동으로 글자가 입력됩니다.</p>
+      <textarea id="voiceMemo" placeholder="말씀 묵상 메모를 여기에 적거나, 스페이스바를 누르고 말해보세요."></textarea>
+      <div id="memoStatus">음성 인식 대기 중 (브라우저에서 음성 인식을 지원해야 합니다)</div>
     </div>
   </div>
 
@@ -272,7 +350,7 @@
       }
     ];
 
-    // 재생 순서 관리용: 항상 "tracks 배열의 인덱스"를 담음
+    // 재생 순서 관리용
     let order = tracks.map((_, i) => i);
     let currentPos = 0; // order 배열 안에서의 위치
     let currentMode = 1; // 1~4
@@ -280,12 +358,14 @@
     let isPlaying = false;
 
     // DOM
+    const appRoot = document.getElementById("appRoot");
     const modeSelect = document.getElementById("modeSelect");
     const prevBtn = document.getElementById("prevBtn");
     const playPauseBtn = document.getElementById("playPauseBtn");
     const nextBtn = document.getElementById("nextBtn");
     const shuffleBtn = document.getElementById("shuffleBtn");
     const resetOrderBtn = document.getElementById("resetOrderBtn");
+    const fsBtn = document.getElementById("fsBtn");
     const searchInput = document.getElementById("searchInput");
     const clearSearchBtn = document.getElementById("clearSearchBtn");
     const trackTbody = document.getElementById("trackTbody");
@@ -295,6 +375,27 @@
     const meaningOverlay = document.getElementById("meaningOverlay");
     const sentenceBody = document.getElementById("sentenceBody");
     const meaningBody = document.getElementById("meaningBody");
+
+    // 녹음 관련 DOM
+    const recordBtn = document.getElementById("recordBtn");
+    const playRecordBtn = document.getElementById("playRecordBtn");
+    const recordStatus = document.getElementById("recordStatus");
+    const recordedAudio = document.getElementById("recordedAudio");
+
+    // 음성 메모 관련 DOM
+    const voiceMemo = document.getElementById("voiceMemo");
+    const memoStatus = document.getElementById("memoStatus");
+
+    // 녹음 상태
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let isRecording = false;
+
+    // 음성 인식 상태
+    let recognition = null;
+    let isSpeechSupported = false;
+    let isListening = false;
+    let spacePressed = false;
 
     // === 유틸 ===
     function getCurrentTrackIndex() {
@@ -477,6 +578,136 @@
       meaningOverlay.classList.remove("visible");
     }
 
+    // === 전체화면 ===
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        appRoot.requestFullscreen?.().catch(err => {
+          console.error("전체화면 요청 실패:", err);
+        });
+      } else {
+        document.exitFullscreen?.();
+      }
+    }
+
+    document.addEventListener("fullscreenchange", () => {
+      if (document.fullscreenElement) {
+        fsBtn.textContent = "✕ 전체화면 해제";
+      } else {
+        fsBtn.textContent = "⛶ 전체화면";
+      }
+    });
+
+    // === 녹음 기능 (발음 테스트) ===
+    async function startRecording() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        recordedChunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) {
+            recordedChunks.push(e.data);
+          }
+        };
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: "audio/webm" });
+          const url = URL.createObjectURL(blob);
+          recordedAudio.src = url;
+          recordedAudio.style.display = "block";
+          playRecordBtn.disabled = false;
+          recordStatus.textContent = "녹음 완료 (다시 듣기 버튼을 눌러보세요)";
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+        recordBtn.textContent = "■ 녹음 정지";
+        recordStatus.textContent = "녹음 중...";
+      } catch (err) {
+        console.error("녹음 에러:", err);
+        recordStatus.textContent = "마이크 권한을 허용해 주세요.";
+      }
+    }
+
+    function stopRecording() {
+      if (mediaRecorder && isRecording) {
+        mediaRecorder.stop();
+        mediaRecorder.stream.getTracks().forEach((t) => t.stop());
+        isRecording = false;
+        recordBtn.textContent = "🎙 녹음 시작";
+      }
+    }
+
+    // === 음성 인식 (스페이스바 누르고 있을 때) ===
+    function initSpeechRecognition() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        memoStatus.textContent = "이 브라우저에서는 음성 인식을 지원하지 않습니다. (Chrome 권장)";
+        isSpeechSupported = false;
+        return;
+      }
+
+      recognition = new SpeechRecognition();
+      recognition.lang = "ko-KR";    // 메모는 보통 한글로 쓸 것 같아서 기본 한국어
+      recognition.interimResults = true;
+      recognition.continuous = false;
+
+      recognition.onstart = () => {
+        isListening = true;
+        memoStatus.textContent = "음성 인식 중... (스페이스바를 떼면 종료됩니다)";
+        voiceMemo.classList.add("listening");
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        voiceMemo.classList.remove("listening");
+        if (!spacePressed) {
+          memoStatus.textContent = "음성 인식 대기 중 (스페이스바를 누르고 말해보세요)";
+        }
+      };
+
+      recognition.onerror = (e) => {
+        console.error("Speech recognition error:", e);
+        memoStatus.textContent = "음성 인식 중 오류가 발생했습니다.";
+      };
+
+      recognition.onresult = (event) => {
+        let finalTranscript = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            finalTranscript += result[0].transcript + " ";
+          }
+        }
+        if (finalTranscript) {
+          const current = voiceMemo.value.trim();
+          voiceMemo.value = current ? current + " " + finalTranscript.trim() : finalTranscript.trim();
+        }
+      };
+
+      isSpeechSupported = true;
+      memoStatus.textContent = "음성 인식 대기 중 (스페이스바를 누르고 말해보세요)";
+    }
+
+    function startVoiceInput() {
+      if (!isSpeechSupported || !recognition) return;
+      try {
+        recognition.start();
+      } catch (e) {
+        // 이미 실행 중일 때 start 하면 에러가 날 수 있음
+        console.warn("Recognition start 오류 또는 중복 실행:", e);
+      }
+    }
+
+    function stopVoiceInput() {
+      if (!isSpeechSupported || !recognition) return;
+      try {
+        recognition.stop();
+      } catch (e) {
+        console.warn("Recognition stop 오류:", e);
+      }
+    }
+
     // === 이벤트 바인딩 ===
     modeSelect.addEventListener("change", () => {
       currentMode = Number(modeSelect.value);
@@ -484,7 +715,6 @@
 
     playPauseBtn.addEventListener("click", () => {
       if (!isPlaying) {
-        // 재생
         if (!audio.src) loadCurrentTrack();
         playCurrent();
       } else {
@@ -501,6 +731,10 @@
 
     resetOrderBtn.addEventListener("click", () => {
       resetOrder();
+    });
+
+    fsBtn.addEventListener("click", () => {
+      toggleFullscreen();
     });
 
     searchInput.addEventListener("input", () => {
@@ -532,10 +766,37 @@
       }
     });
 
-    // 키보드 단축키 (입력창에서는 동작 X)
+    // 키보드 단축키 (입력창/텍스트영역에서는 동작 X)
     document.addEventListener("keydown", (e) => {
       const tag = e.target.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (tag === "INPUT" || tag === "TEXTAREA") {
+        // 음성 메모는 스페이스로 입력할 거라, 텍스트 직접 입력 중에는 단축키 막는 게 안전
+        return;
+      }
+
+      // 스페이스바: 음성 메모 입력 (누르고 있는 동안)
+      if (e.code === "Space") {
+        if (!spacePressed) {
+          spacePressed = true;
+          e.preventDefault();
+          if (isSpeechSupported) {
+            startVoiceInput();
+          }
+        }
+        return;
+      }
+
+      // Enter: 재생/일시정지
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (!isPlaying) {
+          if (!audio.src) loadCurrentTrack();
+          playCurrent();
+        } else {
+          pauseCurrent();
+        }
+        return;
+      }
 
       if (e.key === "s" || e.key === "S") {
         if (sentenceOverlay.classList.contains("visible")) {
@@ -548,6 +809,24 @@
           hideMeaningPopup();
         } else {
           showMeaningPopup();
+        }
+      } else if (e.key === "f" || e.key === "F") {
+        // 전체화면
+        toggleFullscreen();
+      } else if (e.key === "ArrowRight") {
+        // 다음 문장
+        nextTrack(isPlaying);
+      } else if (e.key === "ArrowLeft") {
+        // 이전 문장
+        prevTrack(isPlaying);
+      }
+    });
+
+    document.addEventListener("keyup", (e) => {
+      if (e.code === "Space" && spacePressed) {
+        spacePressed = false;
+        if (isSpeechSupported) {
+          stopVoiceInput();
         }
       }
     });
@@ -582,11 +861,28 @@
       touchStartY = null;
     }, { passive: true });
 
+    // 녹음 버튼
+    recordBtn.addEventListener("click", () => {
+      if (!isRecording) {
+        startRecording();
+      } else {
+        stopRecording();
+      }
+    });
+
+    // 녹음 재생 버튼
+    playRecordBtn.addEventListener("click", () => {
+      if (recordedAudio.src) {
+        recordedAudio.play().catch(err => console.error(err));
+      }
+    });
+
     // 초기 렌더링
     (function init() {
       currentMode = Number(modeSelect.value);
       loadCurrentTrack();
       renderList();
+      initSpeechRecognition();
     })();
   </script>
 </body>
