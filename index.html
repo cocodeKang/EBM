@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>영어 말씀 묵상 플레이어</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f5f8;
+      color: #222;
+    }
+    .app {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.4rem;
+    }
+    .hint {
+      font-size: 0.85rem;
+      color: #555;
+      margin-bottom: 12px;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    select, input[type="text"], button {
+      font: inherit;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      background: white;
+    }
+    button {
+      cursor: pointer;
+      border: 1px solid #bbb;
+    }
+    button:hover {
+      background: #eee;
+    }
+    button.primary {
+      background: #2f7cf6;
+      color: white;
+      border-color: #2f7cf6;
+    }
+    button.primary:hover {
+      background: #225ec0;
+    }
+    .search-box {
+      margin: 8px 0 12px;
+      display: flex;
+      gap: 8px;
+    }
+    .search-box input {
+      flex: 1;
+    }
+    .now-playing {
+      margin: 6px 0 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: #fff;
+      border-left: 4px solid #2f7cf6;
+      font-size: 0.9rem;
+    }
+    .now-playing-title {
+      font-weight: 600;
+    }
+    .list {
+      background: white;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #ddd;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    thead {
+      background: #f0f0f5;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    th, td {
+      padding: 8px 6px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+    th:nth-child(1), td:nth-child(1) {
+      width: 32px;
+      text-align: center;
+    }
+    th:nth-child(4), td:nth-child(4) {
+      width: 70px;
+      text-align: center;
+    }
+    tr.active {
+      background: #e8f1ff;
+    }
+    tr:hover {
+      background: #f7f7fc;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      background: #eee;
+      margin-left: 4px;
+    }
+    .mode-label {
+      font-size: 0.85rem;
+    }
+
+    /* 팝업 공통 */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 50;
+    }
+    .overlay.visible {
+      display: flex;
+    }
+    .popup {
+      max-width: 640px;
+      width: 100%;
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 18px 16px;
+      box-shadow: 0 14px 40px rgba(0,0,0,0.25);
+    }
+    .popup-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #666;
+      margin-bottom: 6px;
+    }
+    .popup-body {
+      font-size: 1.05rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+    .popup-hint {
+      margin-top: 10px;
+      font-size: 0.8rem;
+      color: #888;
+      text-align: right;
+    }
+
+    @media (max-width: 600px) {
+      th:nth-child(3), td:nth-child(3) {
+        display: none; /* 모바일에서 한국어 의미 컬럼 숨기기 (팝업으로 보기) */
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <h1>영어 말씀 묵상 플레이어</h1>
+    <div class="hint">
+      🎧 재생모드: 1=일반 / 2=한 곡 반복 / 3=재생 후 다음 곡(수동 재생) / 4=연속 자동재생<br>
+      ⌨ 키보드: <b>S</b> = 문장 팝업, <b>M</b> = 의미 팝업<br>
+      📱 모바일: <b>위로 스와이프</b> = 문장 / <b>아래로 스와이프</b> = 의미 (팝업 터치 시 닫힘)
+    </div>
+
+    <div class="controls">
+      <label class="mode-label">
+        재생 모드:
+        <select id="modeSelect">
+          <option value="1">1. 일반 재생 (끝나면 멈춤)</option>
+          <option value="2">2. 반복 재생 (현재 곡 반복)</option>
+          <option value="3">3. 재생 후 다음 곡으로 (자동 이동만)</option>
+          <option value="4">4. 자동 연속재생 (플레이리스트)</option>
+        </select>
+      </label>
+
+      <button id="prevBtn">⏮ 이전</button>
+      <button id="playPauseBtn" class="primary">▶ 재생</button>
+      <button id="nextBtn">⏭ 다음</button>
+
+      <button id="shuffleBtn">🔀 전체 랜덤</button>
+      <button id="resetOrderBtn">↺ 순차 재생(초기화)</button>
+    </div>
+
+    <div class="search-box">
+      <input id="searchInput" type="text" placeholder="영어 또는 한글로 검색..." />
+      <button id="clearSearchBtn">지우기</button>
+    </div>
+
+    <div class="now-playing" id="nowPlaying">
+      <div><span class="now-playing-label">현재 선택:</span></div>
+      <div class="now-playing-title" id="npTitle">아직 선택된 트랙이 없습니다.</div>
+      <div id="npSubtitle" style="font-size:0.8rem;color:#666;"></div>
+    </div>
+
+    <div class="list">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>영어 문장</th>
+            <th>뜻(요약)</th>
+            <th>재생</th>
+          </tr>
+        </thead>
+        <tbody id="trackTbody">
+          <!-- JS에서 채움 -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 문장 팝업 -->
+  <div class="overlay" id="sentenceOverlay">
+    <div class="popup">
+      <div class="popup-title">영어 문장</div>
+      <div class="popup-body" id="sentenceBody"></div>
+      <div class="popup-hint">탭(클릭)하면 닫힙니다</div>
+    </div>
+  </div>
+
+  <!-- 의미 팝업 -->
+  <div class="overlay" id="meaningOverlay">
+    <div class="popup">
+      <div class="popup-title">의미 (한국어)</div>
+      <div class="popup-body" id="meaningBody"></div>
+      <div class="popup-hint">탭(클릭)하면 닫힙니다</div>
+    </div>
+  </div>
+
+  <script>
+    // === 데이터 정의 ===
+    const tracks = [
+      {
+        id: 1,
+        text: "Role of the Holy Spirit",
+        meaning: "성령의 역할",
+        src: "https://github.com/cocodeKang/mp3/blob/main/Role%2Bof%2Bthe%2BHoly%2BSpirit_.mp3?raw=1"
+      },
+      {
+        id: 2,
+        text: "The Holy Spirit plays a crucial role in guiding believers through the process of self-reflection.",
+        meaning: "성령은 신자가 자기 자신을 돌아보고 점검하도록 인도하는 매우 중요한 역할을 하신다.",
+        src: "https://github.com/cocodeKang/mp3/blob/main/The%2BHoly%2BSpirit%2Bplays%2Ba%2Bcrucial%2Brole%2Bin%2Bguiding%2Bbe.mp3?raw=1"
+      },
+      {
+        id: 3,
+        text: 'John 16:13 states, "But when He, the Spirit of truth, comes, He will guide you into all truth." .',
+        meaning: "요한복음 16:13 — 진리의 영이신 성령께서 오시면 신자들을 모든 진리 가운데로 인도하신다.",
+        src: "https://github.com/cocodeKang/mp3/blob/main/John%2B16_13%2Bstates%252C%2B_But%2Bwhen%2BHe%252C%2Bthe%2BSpirit%2Bof%2Btru.mp3?raw=1"
+      },
+      {
+        id: 4,
+        text: "The Spirit convicts, teaches, and reveals areas in need of growth, helping believers to conform to the image of Christ.",
+        meaning: "성령은 죄를 깨닫게 하시고, 가르치시며, 성장해야 할 부분을 보여 주셔서 신자들이 그리스도의 모습으로 변화되도록 돕는다.",
+        src: "https://github.com/cocodeKang/mp3/blob/main/The%2BSpirit%2Bconvicts%252C%2Bteaches%252C%2Band%2Breveals%2Bareas%2Bin.mp3?raw=1"
+      }
+    ];
+
+    // 재생 순서 관리용: 항상 "tracks 배열의 인덱스"를 담음
+    let order = tracks.map((_, i) => i);
+    let currentPos = 0; // order 배열 안에서의 위치
+    let currentMode = 1; // 1~4
+    const audio = new Audio();
+    let isPlaying = false;
+
+    // DOM
+    const modeSelect = document.getElementById("modeSelect");
+    const prevBtn = document.getElementById("prevBtn");
+    const playPauseBtn = document.getElementById("playPauseBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const shuffleBtn = document.getElementById("shuffleBtn");
+    const resetOrderBtn = document.getElementById("resetOrderBtn");
+    const searchInput = document.getElementById("searchInput");
+    const clearSearchBtn = document.getElementById("clearSearchBtn");
+    const trackTbody = document.getElementById("trackTbody");
+    const npTitle = document.getElementById("npTitle");
+    const npSubtitle = document.getElementById("npSubtitle");
+    const sentenceOverlay = document.getElementById("sentenceOverlay");
+    const meaningOverlay = document.getElementById("meaningOverlay");
+    const sentenceBody = document.getElementById("sentenceBody");
+    const meaningBody = document.getElementById("meaningBody");
+
+    // === 유틸 ===
+    function getCurrentTrackIndex() {
+      return order[currentPos] ?? 0;
+    }
+    function getCurrentTrack() {
+      return tracks[getCurrentTrackIndex()];
+    }
+
+    function renderList() {
+      const q = searchInput.value.trim().toLowerCase();
+      trackTbody.innerHTML = "";
+      order.forEach((trackIdx, pos) => {
+        const t = tracks[trackIdx];
+        const en = t.text.toLowerCase();
+        const ko = t.meaning.toLowerCase();
+
+        if (q && !en.includes(q) && !ko.includes(q)) {
+          return; // 검색에 안 걸리면 숨김
+        }
+
+        const tr = document.createElement("tr");
+        if (pos === currentPos) {
+          tr.classList.add("active");
+        }
+        tr.dataset.pos = String(pos);
+
+        const tdNum = document.createElement("td");
+        tdNum.textContent = String(pos + 1);
+
+        const tdEn = document.createElement("td");
+        tdEn.textContent = t.text;
+
+        const tdKo = document.createElement("td");
+        tdKo.textContent = t.meaning;
+
+        const tdPlay = document.createElement("td");
+        const btn = document.createElement("button");
+        btn.textContent = "▶";
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          selectTrack(pos);
+          playCurrent();
+        });
+        tdPlay.appendChild(btn);
+
+        tr.appendChild(tdNum);
+        tr.appendChild(tdEn);
+        tr.appendChild(tdKo);
+        tr.appendChild(tdPlay);
+
+        tr.addEventListener("click", () => {
+          selectTrack(pos);
+        });
+
+        trackTbody.appendChild(tr);
+      });
+      updateNowPlaying();
+    }
+
+    function selectTrack(pos) {
+      currentPos = pos;
+      loadCurrentTrack();
+      highlightActiveRow();
+      updateNowPlaying();
+    }
+
+    function highlightActiveRow() {
+      [...trackTbody.querySelectorAll("tr")].forEach((tr) => {
+        const p = Number(tr.dataset.pos);
+        tr.classList.toggle("active", p === currentPos);
+      });
+    }
+
+    function loadCurrentTrack() {
+      const t = getCurrentTrack();
+      audio.src = t.src;
+    }
+
+    function updateNowPlaying() {
+      const t = getCurrentTrack();
+      if (!t) {
+        npTitle.textContent = "아직 선택된 트랙이 없습니다.";
+        npSubtitle.textContent = "";
+        return;
+      }
+      npTitle.textContent = t.text;
+      npSubtitle.textContent = t.meaning;
+    }
+
+    async function playCurrent() {
+      const t = getCurrentTrack();
+      if (!t) return;
+      if (!audio.src) loadCurrentTrack();
+      try {
+        await audio.play();
+        isPlaying = true;
+        playPauseBtn.textContent = "⏸ 일시정지";
+        playPauseBtn.classList.add("primary");
+        highlightActiveRow();
+      } catch (err) {
+        console.error("재생 오류:", err);
+      }
+    }
+
+    function pauseCurrent() {
+      audio.pause();
+      isPlaying = false;
+      playPauseBtn.textContent = "▶ 재생";
+      playPauseBtn.classList.add("primary");
+    }
+
+    function nextTrack(autoPlay = false) {
+      if (order.length === 0) return;
+      currentPos = (currentPos + 1) % order.length;
+      loadCurrentTrack();
+      highlightActiveRow();
+      updateNowPlaying();
+      if (autoPlay) {
+        playCurrent();
+      } else {
+        pauseCurrent();
+      }
+    }
+
+    function prevTrack(autoPlay = false) {
+      if (order.length === 0) return;
+      currentPos = (currentPos - 1 + order.length) % order.length;
+      loadCurrentTrack();
+      highlightActiveRow();
+      updateNowPlaying();
+      if (autoPlay) {
+        playCurrent();
+      } else {
+        pauseCurrent();
+      }
+    }
+
+    function shuffleArray(arr) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function shuffleOrder() {
+      order = shuffleArray(tracks.map((_, i) => i));
+      currentPos = 0;
+      loadCurrentTrack();
+      renderList();
+    }
+
+    function resetOrder() {
+      order = tracks.map((_, i) => i);
+      currentPos = 0;
+      loadCurrentTrack();
+      renderList();
+    }
+
+    function showSentencePopup() {
+      const t = getCurrentTrack();
+      if (!t) return;
+      sentenceBody.textContent = t.text;
+      sentenceOverlay.classList.add("visible");
+    }
+
+    function showMeaningPopup() {
+      const t = getCurrentTrack();
+      if (!t) return;
+      meaningBody.textContent = t.meaning;
+      meaningOverlay.classList.add("visible");
+    }
+
+    function hideSentencePopup() {
+      sentenceOverlay.classList.remove("visible");
+    }
+    function hideMeaningPopup() {
+      meaningOverlay.classList.remove("visible");
+    }
+
+    // === 이벤트 바인딩 ===
+    modeSelect.addEventListener("change", () => {
+      currentMode = Number(modeSelect.value);
+    });
+
+    playPauseBtn.addEventListener("click", () => {
+      if (!isPlaying) {
+        // 재생
+        if (!audio.src) loadCurrentTrack();
+        playCurrent();
+      } else {
+        pauseCurrent();
+      }
+    });
+
+    prevBtn.addEventListener("click", () => prevTrack(isPlaying));
+    nextBtn.addEventListener("click", () => nextTrack(isPlaying));
+
+    shuffleBtn.addEventListener("click", () => {
+      shuffleOrder();
+    });
+
+    resetOrderBtn.addEventListener("click", () => {
+      resetOrder();
+    });
+
+    searchInput.addEventListener("input", () => {
+      renderList();
+    });
+
+    clearSearchBtn.addEventListener("click", () => {
+      searchInput.value = "";
+      renderList();
+      searchInput.focus();
+    });
+
+    // 오디오 끝났을 때 모드별 처리
+    audio.addEventListener("ended", () => {
+      switch (currentMode) {
+        case 1: // 일반 재생
+          pauseCurrent();
+          break;
+        case 2: // 반복 재생
+          audio.currentTime = 0;
+          playCurrent();
+          break;
+        case 3: // 다음 곡으로 이동만 (자동재생 X)
+          nextTrack(false);
+          break;
+        case 4: // 다음 곡 자동재생
+          nextTrack(true);
+          break;
+      }
+    });
+
+    // 키보드 단축키 (입력창에서는 동작 X)
+    document.addEventListener("keydown", (e) => {
+      const tag = e.target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+      if (e.key === "s" || e.key === "S") {
+        if (sentenceOverlay.classList.contains("visible")) {
+          hideSentencePopup();
+        } else {
+          showSentencePopup();
+        }
+      } else if (e.key === "m" || e.key === "M") {
+        if (meaningOverlay.classList.contains("visible")) {
+          hideMeaningPopup();
+        } else {
+          showMeaningPopup();
+        }
+      }
+    });
+
+    // 팝업 터치/클릭 시 닫기
+    sentenceOverlay.addEventListener("click", hideSentencePopup);
+    meaningOverlay.addEventListener("click", hideMeaningPopup);
+
+    // 모바일 스와이프 (위/아래)
+    let touchStartY = null;
+    document.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 1) {
+        touchStartY = e.touches[0].clientY;
+      }
+    }, { passive: true });
+
+    document.addEventListener("touchend", (e) => {
+      if (touchStartY === null) return;
+      const endY = (e.changedTouches[0] || e.touches[0]).clientY;
+      const dy = endY - touchStartY;
+
+      const THRESHOLD = 40; // px
+      if (Math.abs(dy) > THRESHOLD) {
+        if (dy < 0) {
+          // 위로 스와이프 => 문장
+          showSentencePopup();
+        } else {
+          // 아래로 스와이프 => 의미
+          showMeaningPopup();
+        }
+      }
+      touchStartY = null;
+    }, { passive: true });
+
+    // 초기 렌더링
+    (function init() {
+      currentMode = Number(modeSelect.value);
+      loadCurrentTrack();
+      renderList();
+    })();
+  </script>
+</body>
+</html>
