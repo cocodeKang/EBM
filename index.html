@@ -74,6 +74,11 @@
     .now-playing-title {
       font-weight: 600;
     }
+    .rate-display {
+      font-size: 0.8rem;
+      color: #555;
+      margin-left: auto;
+    }
     .list {
       background: white;
       border-radius: 10px;
@@ -230,9 +235,11 @@
     <h1>영어 말씀 묵상 플레이어</h1>
     <div class="hint">
       🎧 재생모드: 1=일반 / 2=한 곡 반복 / 3=재생 후 다음 곡(자동이동만) / 4=연속 자동재생<br>
-      ⌨ 키보드: <b>S</b>=문장 팝업, <b>M</b>=의미 팝업, <b>←/→</b>=이전/다음, <b>Enter</b>=재생/일시정지, <b>F</b>=전체화면 토글,<br>
-      ⌨ <b>Space</b> = 누르고 있는 동안 음성 메모 입력(음성 인식)<br>
-      📱 모바일: <b>위로 스와이프</b>=문장 / <b>아래로 스와이프</b>=의미 (팝업 터치 시 닫힘)
+      ⌨ 키보드: <b>S</b>=문장 팝업, <b>M</b>=의미 팝업, <b>←/→</b>=이전/다음, <b>Enter</b>=재생/일시정지, <b>F</b>=전체화면<br>
+      ⌨ <b>E</b> = 누르고 있는 동안 음성 메모 입력 (Speech-to-Text)<br>
+      ⌨ <b>P</b>=녹음 시작/정지, <b>L</b>=녹음 듣기<br>
+      ⌨ 숫자 <b>0~9</b> = 0%·10%·...·90% 위치로 점프 후 재생<br>
+      ⌨ <b>↑/↓</b> = 재생속도 10%씩 조절 (전체 문장에 공통적용)
     </div>
 
     <div class="controls">
@@ -253,6 +260,8 @@
       <button id="shuffleBtn">🔀 전체 랜덤</button>
       <button id="resetOrderBtn">↺ 순차 재생(초기화)</button>
       <button id="fsBtn">⛶ 전체화면</button>
+
+      <span id="rateDisplay" class="rate-display">재생속도: 100%</span>
     </div>
 
     <div class="search-box">
@@ -297,8 +306,8 @@
     <!-- 음성 메모 영역 (Speech-to-Text) -->
     <div class="memo-section">
       <h2>메모 (음성 입력)</h2>
-      <p>스페이스바를 누르고 있는 동안 말하면, 아래 메모 칸에 자동으로 글자가 입력됩니다.</p>
-      <textarea id="voiceMemo" placeholder="말씀 묵상 메모를 여기에 적거나, 스페이스바를 누르고 말해보세요."></textarea>
+      <p>E 키를 누르고 있는 동안 말하면, 아래 메모 칸에 자동으로 글자가 입력됩니다.</p>
+      <textarea id="voiceMemo" placeholder="말씀 묵상 메모를 여기에 적거나, E 키를 누르고 말해보세요."></textarea>
       <div id="memoStatus">음성 인식 대기 중 (브라우저에서 음성 인식을 지원해야 합니다)</div>
     </div>
   </div>
@@ -357,6 +366,12 @@
     const audio = new Audio();
     let isPlaying = false;
 
+    // 재생속도 관리 (전체 문장에 공통)
+    let playbackRate = 1.0;
+    const MIN_RATE = 0.5;
+    const MAX_RATE = 2.0;
+    let pendingSeekPercent = null;
+
     // DOM
     const appRoot = document.getElementById("appRoot");
     const modeSelect = document.getElementById("modeSelect");
@@ -366,6 +381,7 @@
     const shuffleBtn = document.getElementById("shuffleBtn");
     const resetOrderBtn = document.getElementById("resetOrderBtn");
     const fsBtn = document.getElementById("fsBtn");
+    const rateDisplay = document.getElementById("rateDisplay");
     const searchInput = document.getElementById("searchInput");
     const clearSearchBtn = document.getElementById("clearSearchBtn");
     const trackTbody = document.getElementById("trackTbody");
@@ -395,7 +411,7 @@
     let recognition = null;
     let isSpeechSupported = false;
     let isListening = false;
-    let spacePressed = false;
+    let voiceKeyPressed = false; // E 키 누르고 있는지
 
     // === 유틸 ===
     function getCurrentTrackIndex() {
@@ -403,6 +419,11 @@
     }
     function getCurrentTrack() {
       return tracks[getCurrentTrackIndex()];
+    }
+
+    function applyPlaybackRate() {
+      audio.playbackRate = playbackRate;
+      rateDisplay.textContent = "재생속도: " + Math.round(playbackRate * 100) + "%";
     }
 
     function renderList() {
@@ -473,6 +494,7 @@
     function loadCurrentTrack() {
       const t = getCurrentTrack();
       audio.src = t.src;
+      applyPlaybackRate();
     }
 
     function updateNowPlaying() {
@@ -491,6 +513,7 @@
       if (!t) return;
       if (!audio.src) loadCurrentTrack();
       try {
+        applyPlaybackRate();
         await audio.play();
         isPlaying = true;
         playPauseBtn.textContent = "⏸ 일시정지";
@@ -616,7 +639,7 @@
           recordedAudio.src = url;
           recordedAudio.style.display = "block";
           playRecordBtn.disabled = false;
-          recordStatus.textContent = "녹음 완료 (다시 듣기 버튼을 눌러보세요)";
+          recordStatus.textContent = "녹음 완료 (L 키 또는 버튼으로 다시 들을 수 있습니다)";
         };
 
         mediaRecorder.start();
@@ -638,7 +661,7 @@
       }
     }
 
-    // === 음성 인식 (스페이스바 누르고 있을 때) ===
+    // === 음성 인식 (E 키 누르고 있을 때) ===
     function initSpeechRecognition() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
@@ -648,21 +671,21 @@
       }
 
       recognition = new SpeechRecognition();
-      recognition.lang = "ko-KR";    // 메모는 보통 한글로 쓸 것 같아서 기본 한국어
+      recognition.lang = "ko-KR";    // 메모는 기본 한국어
       recognition.interimResults = true;
       recognition.continuous = false;
 
       recognition.onstart = () => {
         isListening = true;
-        memoStatus.textContent = "음성 인식 중... (스페이스바를 떼면 종료됩니다)";
+        memoStatus.textContent = "음성 인식 중... (E 키를 떼면 종료됩니다)";
         voiceMemo.classList.add("listening");
       };
 
       recognition.onend = () => {
         isListening = false;
         voiceMemo.classList.remove("listening");
-        if (!spacePressed) {
-          memoStatus.textContent = "음성 인식 대기 중 (스페이스바를 누르고 말해보세요)";
+        if (!voiceKeyPressed) {
+          memoStatus.textContent = "음성 인식 대기 중 (E 키를 누르고 말해보세요)";
         }
       };
 
@@ -681,12 +704,14 @@
         }
         if (finalTranscript) {
           const current = voiceMemo.value.trim();
-          voiceMemo.value = current ? current + " " + finalTranscript.trim() : finalTranscript.trim();
+          voiceMemo.value = current
+            ? current + " " + finalTranscript.trim()
+            : finalTranscript.trim();
         }
       };
 
       isSpeechSupported = true;
-      memoStatus.textContent = "음성 인식 대기 중 (스페이스바를 누르고 말해보세요)";
+      memoStatus.textContent = "음성 인식 대기 중 (E 키를 누르고 말해보세요)";
     }
 
     function startVoiceInput() {
@@ -694,7 +719,6 @@
       try {
         recognition.start();
       } catch (e) {
-        // 이미 실행 중일 때 start 하면 에러가 날 수 있음
         console.warn("Recognition start 오류 또는 중복 실행:", e);
       }
     }
@@ -706,6 +730,41 @@
       } catch (e) {
         console.warn("Recognition stop 오류:", e);
       }
+    }
+
+    // === 재생 위치 점프 (숫자 0~9) ===
+    function seekToPercent(percent) {
+      if (!audio.src) {
+        loadCurrentTrack();
+      }
+      if (isFinite(audio.duration) && audio.duration > 0) {
+        audio.currentTime = audio.duration * percent;
+        if (!isPlaying) {
+          playCurrent();
+        }
+        pendingSeekPercent = null;
+      } else {
+        pendingSeekPercent = percent;
+        // 메타데이터 로딩 후 처리
+        if (!isPlaying) {
+          playCurrent();
+        } else {
+          audio.play().catch(() => {});
+        }
+      }
+    }
+
+    audio.addEventListener("loadedmetadata", () => {
+      if (pendingSeekPercent !== null && isFinite(audio.duration) && audio.duration > 0) {
+        audio.currentTime = audio.duration * pendingSeekPercent;
+        pendingSeekPercent = null;
+      }
+    });
+
+    // === 재생속도 조절 (↑ / ↓) ===
+    function adjustPlaybackRate(delta) {
+      playbackRate = Math.min(MAX_RATE, Math.max(MIN_RATE, playbackRate + delta));
+      applyPlaybackRate();
     }
 
     // === 이벤트 바인딩 ===
@@ -770,19 +829,26 @@
     document.addEventListener("keydown", (e) => {
       const tag = e.target.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") {
-        // 음성 메모는 스페이스로 입력할 거라, 텍스트 직접 입력 중에는 단축키 막는 게 안전
         return;
       }
 
-      // 스페이스바: 음성 메모 입력 (누르고 있는 동안)
-      if (e.code === "Space") {
-        if (!spacePressed) {
-          spacePressed = true;
+      // E 키: 음성 메모 입력 (누르고 있는 동안)
+      if (e.key === "e" || e.key === "E") {
+        if (!voiceKeyPressed) {
+          voiceKeyPressed = true;
           e.preventDefault();
           if (isSpeechSupported) {
             startVoiceInput();
           }
         }
+        return;
+      }
+
+      // 숫자 0~9: 퍼센트 위치 점프
+      if (e.key >= "0" && e.key <= "9") {
+        const num = Number(e.key);
+        const percent = num === 0 ? 0 : num / 10; // 0=0%, 1=10%, ..., 9=90%
+        seekToPercent(percent);
         return;
       }
 
@@ -819,12 +885,34 @@
       } else if (e.key === "ArrowLeft") {
         // 이전 문장
         prevTrack(isPlaying);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        adjustPlaybackRate(0.1); // +10%
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        adjustPlaybackRate(-0.1); // -10%
+      } else if (e.key === "p" || e.key === "P") {
+        // 녹음 시작/정지
+        if (!isRecording) {
+          startRecording();
+        } else {
+          stopRecording();
+        }
+      } else if (e.key === "l" || e.key === "L") {
+        // 녹음 듣기
+        if (recordedAudio.src) {
+          recordedAudio.play().catch(err => console.error(err));
+        }
       }
     });
 
     document.addEventListener("keyup", (e) => {
-      if (e.code === "Space" && spacePressed) {
-        spacePressed = false;
+      const tag = e.target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") {
+        return;
+      }
+      if ((e.key === "e" || e.key === "E") && voiceKeyPressed) {
+        voiceKeyPressed = false;
         if (isSpeechSupported) {
           stopVoiceInput();
         }
@@ -882,6 +970,7 @@
       currentMode = Number(modeSelect.value);
       loadCurrentTrack();
       renderList();
+      applyPlaybackRate();
       initSpeechRecognition();
     })();
   </script>
